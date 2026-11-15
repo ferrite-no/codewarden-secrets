@@ -1,17 +1,11 @@
 // The calls to CodeWarden: the token exchange (RFC 8693) and the secrets
-// API (design §32.7, §32.21). Values travel only in POST answers.
+// API (design §32.7, §32.22). Values travel only in POST answers.
 
 export const tokenExchange = "urn:ietf:params:oauth:grant-type:token-exchange";
 export const jwtType = "urn:ietf:params:oauth:token-type:jwt";
 export const accessTokenType = "urn:ietf:params:oauth:token-type:access_token";
 /** The public client a job names at /token: its ID token is the credential. */
 export const workloadClient = "codewarden-workload";
-
-export interface SecretMeta {
-  id: string;
-  name: string;
-  fields?: { name: string; type: string }[];
-}
 
 /** One field's value: text, or bytes for a binary field. */
 export interface FieldValue {
@@ -37,9 +31,9 @@ async function call(url: string, init: RequestInit): Promise<unknown> {
   return JSON.parse(body);
 }
 
-/** Exchanges the job's ID token for a short secrets token. */
-export async function exchange(server: string, resource: string, idToken: string): Promise<string> {
-  const form = new URLSearchParams({
+/** The token exchange's form: the job's ID token and the IDs of the secrets it reads. */
+export function exchangeForm(resource: string, idToken: string, secretIDs: string[]): URLSearchParams {
+  return new URLSearchParams({
     grant_type: tokenExchange,
     client_id: workloadClient,
     subject_token: idToken,
@@ -47,7 +41,13 @@ export async function exchange(server: string, resource: string, idToken: string
     requested_token_type: accessTokenType,
     resource,
     scope: "secrets.read secrets.use",
+    secret_ids: secretIDs.join(" "),
   });
+}
+
+/** Exchanges the job's ID token for a short secrets token for exactly these secrets. */
+export async function exchange(server: string, resource: string, idToken: string, secretIDs: string[]): Promise<string> {
+  const form = exchangeForm(resource, idToken, secretIDs);
   const out = (await call(server + "/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
@@ -61,12 +61,6 @@ export async function exchange(server: string, resource: string, idToken: string
 
 function auth(token: string): Record<string, string> {
   return { Authorization: "Bearer " + token, Accept: "application/json" };
-}
-
-/** The secrets the token reaches. */
-export async function list(server: string, token: string): Promise<SecretMeta[]> {
-  const out = (await call(server + "/secrets/v1/secrets", { headers: auth(token) })) as { secrets?: SecretMeta[] };
-  return out.secrets ?? [];
 }
 
 /** Reads every field of a secret, or one. */
@@ -99,17 +93,4 @@ export async function read(server: string, token: string, id: string, field?: st
     vals.push({ name, bytes: Buffer.from(b64, "base64") });
   }
   return vals.sort((a, b) => (a.name < b.name ? -1 : 1));
-}
-
-/** Finds a secret by name or "id:<uuid>" among those the token reaches. */
-export function resolve(secrets: SecretMeta[], ref: string): SecretMeta {
-  const hits = ref.startsWith("id:") ? secrets.filter((s) => s.id === ref.slice(3)) : secrets.filter((s) => s.name === ref);
-  if (hits.length !== 1) {
-    throw new Error(
-      hits.length === 0
-        ? `codewarden-secrets: no secret "${ref}" is shared with this job; check the rule on the secret's page`
-        : `codewarden-secrets: several secrets are named "${ref}"; write id:<uuid>`,
-    );
-  }
-  return hits[0]!;
 }

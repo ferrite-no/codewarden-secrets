@@ -1,9 +1,9 @@
-// What the Action exports, read from its "secrets" input (design §32.21).
+// What the Action exports, read from its "secrets" input (design §32.22).
 // Pure functions, tested without GitHub.
 
 /** One line of the input. */
 export interface Spec {
-  /** The secret: its name, or "id:<uuid>". */
+  /** The secret's ID (a UUID): secrets are named by ID only, never by name. */
   secret: string;
   /** The one field to export; undefined exports every field. */
   field?: string;
@@ -15,20 +15,21 @@ export interface Spec {
 
 const envName = /^[A-Z_][A-Z0-9_]{0,99}$/;
 const fieldName = /^[a-z0-9_]{1,64}$/;
-const secretRef = /^(id:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[A-Za-z0-9._/-]{1,128})$/;
+const secretID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-/** The variable name for a secret's name: upper case, other characters _. */
-export function variableOf(secret: string): string {
-  const base = secret.replace(/^id:/, "").toUpperCase().replace(/[^A-Z0-9_]/g, "_");
-  return /^[0-9]/.test(base) ? "_" + base : base;
-}
+/** The most secrets one exchange may name. */
+export const maxSecrets = 20;
 
 /** The variable of one field under a prefix. */
 export function fieldVariable(prefix: string, field: string): string {
   return prefix + "_" + field.toUpperCase();
 }
 
-/** Reads the input; a line that does not read throws, naming its number only. */
+/**
+ * Reads the input; a line that does not read throws, naming its number only.
+ * Secrets are named by ID (review of #243): a name could be another team's
+ * secret of the same name, so it is never looked up.
+ */
 export function parseSpecs(input: string): Spec[] {
   const out: Spec[] = [];
   input.split(/\r?\n/).forEach((raw, i) => {
@@ -36,25 +37,30 @@ export function parseSpecs(input: string): Spec[] {
     if (line === "" || line.startsWith("#")) {
       return;
     }
-    const bad = () => new Error(`codewarden-secrets: line ${i + 1} of "secrets" does not read; write NAME=secret#field, NAME=secret or secret`);
+    const where = `codewarden-secrets: line ${i + 1} of "secrets"`;
+    const bad = () => new Error(`${where} does not read; write NAME=<secret id>#field or NAME=<secret id>`);
     let file = false;
     if (line.startsWith("file:")) {
       file = true;
       line = line.slice(5).trim();
     }
-    let name: string | undefined;
     const eq = line.indexOf("=");
-    if (eq >= 0) {
-      name = line.slice(0, eq).trim();
-      line = line.slice(eq + 1).trim();
+    if (eq < 0) {
+      throw new Error(`${where} names no variable; write NAME=<secret id>#field or NAME=<secret id>`);
     }
+    const name = line.slice(0, eq).trim();
+    line = line.slice(eq + 1).trim();
     const hash = line.indexOf("#");
-    const secret = hash >= 0 ? line.slice(0, hash) : line;
+    const secret = (hash >= 0 ? line.slice(0, hash) : line).toLowerCase();
     const field = hash >= 0 ? line.slice(hash + 1) : undefined;
-    if (!secretRef.test(secret) || (field !== undefined && !fieldName.test(field))) {
+    if (!secretID.test(secret)) {
+      throw new Error(
+        `${where}: secrets are named by ID, not by name; find the ID with the MCP operation secrets.search or on the secret's page`,
+      );
+    }
+    if (field !== undefined && !fieldName.test(field)) {
       throw bad();
     }
-    name ??= field === undefined ? variableOf(secret) : fieldVariable(variableOf(secret), field);
     if (!envName.test(name) || name.startsWith("GITHUB_") || name.startsWith("RUNNER_") || name === "CODEWARDEN_TOKEN") {
       throw bad();
     }
@@ -63,7 +69,15 @@ export function parseSpecs(input: string): Spec[] {
   if (out.length === 0) {
     throw new Error('codewarden-secrets: "secrets" names no secret');
   }
+  if (secretIDs(out).length > maxSecrets) {
+    throw new Error(`codewarden-secrets: "secrets" names more than ${maxSecrets} secrets`);
+  }
   return out;
+}
+
+/** The distinct secret IDs of specs, in first-seen order: the exchange's secret_ids. */
+export function secretIDs(specs: Spec[]): string[] {
+  return [...new Set(specs.map((s) => s.secret))];
 }
 
 /**

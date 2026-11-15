@@ -1,4 +1,4 @@
-// The Action's main step (design §32.21): the job's OIDC token for
+// The Action's main step (design §32.22): the job's OIDC token for
 // CodeWarden's secrets resource, exchanged for a short secrets token; the
 // secrets read, every value masked first, then exported as variables or
 // 0600 files the post step removes.
@@ -7,8 +7,8 @@ import * as core from "@actions/core";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { exchange, list, read, resolve, type FieldValue } from "./client.js";
-import { binaryMaskPieces, fieldVariable, maskPieces, parseSpecs } from "./spec.js";
+import { exchange, read, type FieldValue } from "./client.js";
+import { binaryMaskPieces, fieldVariable, maskPieces, parseSpecs, secretIDs } from "./spec.js";
 
 interface Exported {
   name: string;
@@ -33,15 +33,14 @@ async function run(): Promise<void> {
   const resource = server + "/secrets";
   const idToken = await core.getIDToken(resource);
   core.setSecret(idToken);
-  const token = await exchange(server, resource, idToken);
+  // The token reaches exactly the secrets named, by ID.
+  const token = await exchange(server, resource, idToken, secretIDs(specs));
   core.setSecret(token);
 
-  const secrets = await list(server, token);
   // Read everything and mask every value before a single one is exported.
   const reads: { spec: (typeof specs)[number]; values: FieldValue[] }[] = [];
   for (const spec of specs) {
-    const s = resolve(secrets, spec.secret);
-    const values = await read(server, token, s.id, spec.field);
+    const values = await read(server, token, spec.secret, spec.field);
     values.forEach(mask);
     reads.push({ spec, values });
   }

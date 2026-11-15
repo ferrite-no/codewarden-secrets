@@ -4,11 +4,11 @@ author: Ferrite
 inputs:
   secrets:
     description: |
-      One per line. NAME=secret#field exports one field as NAME; NAME=secret
-      exports every field as NAME_<FIELD>; a bare secret exports every field
-      as <SECRET>_<FIELD>. A file: prefix writes a 0600 file under
-      RUNNER_TEMP and exports its path instead. A secret is its name or
-      id:<uuid>.
+      One per line. NAME=<secret id>#field exports one field as NAME;
+      NAME=<secret id> exports every field as NAME_<FIELD>. A file: prefix
+      writes a 0600 file under RUNNER_TEMP and exports its path instead. A
+      secret is named by its ID (a UUID), never by its name: find it with
+      the MCP operation secrets.search or on the secret's page.
     required: true
   server:
     description: The CodeWarden server.

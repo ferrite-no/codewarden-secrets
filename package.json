@@ -1,9 +1,9 @@
 {
   "name": "codewarden-secrets",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Get CodeWarden secrets in a GitHub Actions job with the job's own OIDC token (design \u00a732.21).",
-  "license": "Apache-2.0",
+  "license": "SEE LICENSE IN ../../LICENSE",
   "type": "module",
   "engines": {
     "node": ">=24"

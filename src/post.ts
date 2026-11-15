@@ -1,5 +1,5 @@
 // The Action's post step: runs at the end of the job, also after a
-// failure, and removes the files the main step wrote (design §32.21).
+// failure, and removes the files the main step wrote (design §32.22).
 
 import * as core from "@actions/core";
 import { rm } from "node:fs/promises";
