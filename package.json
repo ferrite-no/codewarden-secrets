@@ -1,0 +1,24 @@
+{
+  "name": "codewarden-secrets",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Get CodeWarden secrets in a GitHub Actions job with the job's own OIDC token (design \u00a732.21).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "esbuild src/main.ts src/post.ts --bundle --platform=node --target=node24 --format=esm --outdir=dist --out-extension:.js=.js --legal-comments=eof \"--banner:js=import { createRequire as __cwCreateRequire } from 'node:module'; const require = __cwCreateRequire(import.meta.url);\"",
+    "check": "tsc --noEmit",
+    "test": "esbuild test/spec.test.ts --bundle --platform=node --target=node24 --format=esm --outfile=.test/spec.test.js && node --test .test/spec.test.js"
+  },
+  "dependencies": {
+    "@actions/core": "3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "esbuild": "0.28.2",
+    "typescript": "5.9.3"
+  }
+}

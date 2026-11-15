@@ -1,0 +1,25 @@
+name: CodeWarden secrets
+description: Get CodeWarden secrets with this job's own GitHub OIDC token; no secret is stored in GitHub.
+author: Ferrite
+inputs:
+  secrets:
+    description: |
+      One per line. NAME=secret#field exports one field as NAME; NAME=secret
+      exports every field as NAME_<FIELD>; a bare secret exports every field
+      as <SECRET>_<FIELD>. A file: prefix writes a 0600 file under
+      RUNNER_TEMP and exports its path instead. A secret is its name or
+      id:<uuid>.
+    required: true
+  server:
+    description: The CodeWarden server.
+    default: https://id.ferrite.no
+  export-token:
+    description: Also export the short secrets token as CODEWARDEN_TOKEN, for calls of the secrets API's use.
+    default: "false"
+outputs:
+  exported:
+    description: 'A JSON array of {"name", "secret", "field", "file"}: what was exported. Never a value.'
+runs:
+  using: node24
+  main: dist/main.js
+  post: dist/post.js
